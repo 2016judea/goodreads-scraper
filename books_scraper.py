@@ -1,30 +1,23 @@
 import argparse
-
-import requests
-import bs4 as bs
-from urllib.parse import quote
-import re
-
-from multiprocessing import cpu_count
-from joblib import Parallel, delayed
-
+import io
 import json
-
 import os.path
+import re
 import traceback
+from urllib.parse import quote
 
+import bs4 as bs
+import requests
+from dotenv import load_dotenv
 from termcolor import colored
 
-from dotenv import load_dotenv
 load_dotenv()
 
 BASE_URL = "https://www.goodreads.com"
-COOKIE = os.getenv("SESSION_ID")
-# COOKIE = "_session_id2=83f123e4e12000a123f2bc6ff12da123"
-PAGES_PER_SHELF = int(os.getenv("PAGES_PER_SHELF"))
-# PAGES_PER_SHELF = 3
-JOBS = cpu_count()
-PROCESSING_RATIO_THRESHOLD = 1.0
+# COOKIE = os.getenv("SESSION_ID")
+COOKIE = "_session_id2=61e16ed49c22cef4ec093de58077e2d3"
+# PAGES_PER_SHELF = int(os.getenv("PAGES_PER_SHELF"))
+PAGES_PER_SHELF = 1
 
 
 def print_book(book):
@@ -44,7 +37,7 @@ class GoodreadsScraper():
     def load_shelves(self):
         with open("shelves.txt", "r") as f:
             self.shelves = f.read().splitlines()
-        for year in range(1950, 2021):
+        for year in range(1950, 1960):
             self.shelves.append(str(year))
 
     def scrap_shelves(self):
@@ -57,8 +50,7 @@ class GoodreadsScraper():
 
         # Skip this shelf if already processed
         if self.skip_processed_shelves \
-           and os.path.isfile("shelves_pages/{}_{}.json".format(shelf, i)) \
-           and self.shelf_processing_ratio(shelf, i) >= PROCESSING_RATIO_THRESHOLD:
+           and os.path.isfile("shelves_pages/{}_{}.json".format(shelf, i)):
             print(colored("Finished - {} - page {} - already processed...".format(shelf, i), "magenta", attrs=['bold']))
             return -1
 
@@ -89,9 +81,12 @@ class GoodreadsScraper():
                 )
 
         # Scrap books urls
-        books = Parallel(n_jobs=JOBS, verbose=10)(delayed(self.scrap_book)(book_url) for book_url in books_urls)
+        books = []
+        for book_url in books_urls:
+            result = self.scrap_book(book_url)
+            books.append(self.scrap_book(book_url))
         books = list(filter(lambda x: x is not None, books))
-        with open("shelves_pages/{}_{}.json".format(shelf, i), "w") as f:
+        with open("shelves_pages/{}_{}.json".format(shelf, i), "w", encoding="utf-8", errors="ignore") as f:
             json.dump(
                 {"books": books},
                 f,
@@ -117,7 +112,7 @@ class GoodreadsScraper():
             else:
                 source_book = requests.get(book_url, timeout=5)
                 soup_book = bs.BeautifulSoup(source_book.content, features="html.parser")
-                with open(book_source_page_path, "w") as book_source_page:
+                with io.open(book_source_page_path, "w", encoding='utf-8') as book_source_page:
                     book_source_page.write(str(soup_book))
 
             try:
