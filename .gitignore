@@ -109,6 +109,7 @@ venv.bak/
 # books folders
 books/*.json
 shelves_pages/*.json
+stats/*.json
 
 # source pages
 books_source_pages/http*
